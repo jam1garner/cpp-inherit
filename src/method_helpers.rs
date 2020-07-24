@@ -1,4 +1,4 @@
-use syn::{ImplItemMethod, Attribute};
+use syn::{Attribute, ImplItemMethod};
 
 fn is_override_attr(attr: &Attribute) -> bool {
     attr.path

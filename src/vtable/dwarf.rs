@@ -2,8 +2,8 @@ use object::{Object, ObjectSection};
 use std::{
     borrow::{Borrow, Cow},
     collections::HashMap,
-    path::Path,
     fs,
+    path::Path,
 };
 use typed_arena::Arena;
 type RelocationMap = HashMap<usize, object::Relocation>;
@@ -262,7 +262,7 @@ fn walk_node<'abbrev, 'unit, 'tree, R: gimli::Reader>(
     node: gimli::EntriesTreeNode<'abbrev, 'unit, 'tree, R>,
     unit: &gimli::Unit<R>,
     dwarf: &gimli::Dwarf<R>,
-    vtables: &mut HashMap<String, Vec<VTableElement>>
+    vtables: &mut HashMap<String, Vec<VTableElement>>,
 ) -> Result<(), gimli::Error> {
     let entry = node.entry();
 
@@ -286,7 +286,10 @@ fn walk_node<'abbrev, 'unit, 'tree, R: gimli::Reader>(
     Ok(())
 }
 
-fn dump_file(object: &object::File, endian: gimli::RunTimeEndian) -> Result<HashMap<String, Vec<VTableElement>>, gimli::Error> {
+fn dump_file(
+    object: &object::File,
+    endian: gimli::RunTimeEndian,
+) -> Result<HashMap<String, Vec<VTableElement>>, gimli::Error> {
     let arena = (Arena::new(), Arena::new());
 
     // Load a section and return as `Cow<[u8]>`.

@@ -1,14 +1,14 @@
 use std::ops::Deref;
 
-use quote::quote;
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::{Fields, ImplItem, Path};
 
 mod method_helpers;
-use method_helpers::{filter_overrides, remove_override_attr, make_extern_c};
+use method_helpers::{filter_overrides, make_extern_c, remove_override_attr};
 
 mod parsers;
-use parsers::{NamedField, InheritImplAttr};
+use parsers::{InheritImplAttr, NamedField};
 
 mod vtable;
 use vtable::generate_vtable_const;
@@ -19,10 +19,8 @@ pub fn inherit_from(attr: TokenStream, item: TokenStream) -> TokenStream {
     let ty = syn::parse_macro_input!(attr as syn::Type);
 
     let fields = match struct_def.fields {
-        Fields::Named(ref mut fields) => {
-            &mut fields.named
-        }
-        _ => todo!()
+        Fields::Named(ref mut fields) => &mut fields.named,
+        _ => todo!(),
     };
 
     let base_field: NamedField = syn::parse_quote!(
@@ -33,7 +31,7 @@ pub fn inherit_from(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let struct_name = &struct_def.ident;
 
-    struct_def.attrs.push(syn::parse_quote!{
+    struct_def.attrs.push(syn::parse_quote! {
         #[repr(C)]
     });
 
@@ -53,7 +51,8 @@ pub fn inherit_from(attr: TokenStream, item: TokenStream) -> TokenStream {
                 &mut self._base
             }
         }
-    ).into()
+    )
+    .into()
 }
 
 fn into_path_segment(ident: &&syn::Ident) -> syn::PathSegment {
@@ -64,54 +63,44 @@ fn into_path_segment(ident: &&syn::Ident) -> syn::PathSegment {
 pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
     let InheritImplAttr { class, header, .. } = syn::parse_macro_input!(attr as InheritImplAttr);
-    
+
     let header = header.value();
-    
+
     // List of methods with #[overridden] attrbiute
-    let mut override_items =
-        impl_block
-            .items
-            .iter_mut()
-            .filter_map(|item| {
-                if let ImplItem::Method(ref mut method) = item {
-                    filter_overrides(method)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-    
-    // Make all override methods `extern "C"`
-    override_items
+    let mut override_items = impl_block
+        .items
         .iter_mut()
-        .for_each(make_extern_c);
+        .filter_map(|item| {
+            if let ImplItem::Method(ref mut method) = item {
+                filter_overrides(method)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Make all override methods `extern "C"`
+    override_items.iter_mut().for_each(make_extern_c);
 
     // Remove fake overridden attributes
-    override_items
-        .iter_mut()
-        .for_each(remove_override_attr);
+    override_items.iter_mut().for_each(remove_override_attr);
 
     let vtable_info = vtable::get_vtable_info(&header, &class.to_string());
 
     // Generate a vtable before overrides
-    let base_vtable: Vec<Option<Path>> =
-        vtable_info
-            .iter()
-            .map(|_| None)
-            .collect();
+    let base_vtable: Vec<Option<Path>> = vtable_info.iter().map(|_| None).collect();
 
     // List of method override names
-    let override_list = 
-        override_items
-            .into_iter()
-            .map(|method| method.sig.ident.clone())
-            .collect::<Vec<_>>();
+    let override_list = override_items
+        .into_iter()
+        .map(|method| method.sig.ident.clone())
+        .collect::<Vec<_>>();
 
     let mut vtable = base_vtable;
 
     let type_ident = match *impl_block.self_ty {
         syn::Type::Path(ref path) => path.path.get_ident().unwrap(),
-        _ => todo!() // Error about how class type must be ident
+        _ => todo!(), // Error about how class type must be ident
     };
 
     match vtable_info.get(&class.to_string()) {
@@ -123,25 +112,26 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
                         vtable[index] = Some(Path {
                             leading_colon: None,
                             //          $class::$method
-                            segments: [&type_ident, &o].iter().map(into_path_segment).collect()
+                            segments: [&type_ident, &o].iter().map(into_path_segment).collect(),
                         });
-                    },
-                    Err(..) => todo!() // add compiler error for overriding a non-existing method
+                    }
+                    Err(..) => todo!(), // add compiler error for overriding a non-existing method
                 }
             }
 
             let mut bindings_to_gen = vec![];
 
-            let vtable =
-                vtable
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, x)| x.unwrap_or_else(|| {
+            let vtable = vtable
+                .into_iter()
+                .enumerate()
+                .map(|(i, x)| {
+                    x.unwrap_or_else(|| {
                         bindings_to_gen.push(base_type_vtable[i].default.deref());
 
                         vtable::get_binding_symbol(&base_type_vtable[i].default).into()
-                    }))
-                    .collect();
+                    })
+                })
+                .collect();
 
             let self_type = &impl_block.self_ty;
 
@@ -157,9 +147,9 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #(
                     #bindings
                 )*
-            ).into()
+            )
+            .into()
         }
         None => todo!(), // add compiler error for class not existing in header
     }
 }
-

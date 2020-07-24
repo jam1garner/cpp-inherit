@@ -10,11 +10,15 @@ struct Test {}
 impl Test {
     fn new() -> Self {
         Self {
-            _base: base { vtable_: Test::VTABLE_ as _, value: 3 }
+            _base: base {
+                vtable_: Test::VTABLE_ as _,
+                value: 3,
+            },
         }
     }
 
-    #[overridden] fn x(&self) -> i32 {
+    #[overridden]
+    fn x(&self) -> i32 {
         99
     }
 }
