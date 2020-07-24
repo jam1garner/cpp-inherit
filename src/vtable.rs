@@ -35,14 +35,14 @@ pub fn get_vtable_info(header: &str, class: &str) -> HashMap<String, Vec<VTableE
     let mut gcc =
         Command::new("g++")
             .args(&["-femit-class-debug-always", "-fno-eliminate-unused-debug-types",
-                  "-fno-eliminate-unused-debug-symbols",  "-g3", "-gdwarf-4", "-x", "c++", "-"])
+                  "-fno-eliminate-unused-debug-symbols",  "-g3", "-gdwarf-4", "-x", "c++", "-c"])
             .arg("-o")
             .arg(&out_path)
+            .arg(&header_path)
             .stdin(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .expect("Failed to start g++");
-    write!(gcc.stdin.as_mut().expect("No g++ stdin"), "#include \"{}\"\nint main() {{ return 0; }}", header_path.display()).expect("Failed to write to stdin");
     if gcc.wait().unwrap().success() {
 
     } else {
