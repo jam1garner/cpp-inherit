@@ -1,5 +1,5 @@
-use syn::{Type, Path};
-use quote::{quote, ToTokens};
+use syn::{Type, Path, Ident};
+use quote::{quote, ToTokens, format_ident};
 
 pub fn generate_vtable_const(methods: Vec<Path>, ty: &Type) -> impl ToTokens {
     let method_count = methods.len();
@@ -19,4 +19,13 @@ pub fn generate_vtable_const(methods: Vec<Path>, ty: &Type) -> impl ToTokens {
             const VTABLE_: *const [*const (); #method_count] = #ty::_VTABLE_BORROW_FDKSLASDASD as *const _;
         }
     )
+}
+
+/// Returns a list of the names of methods, in order of their layout in memory
+pub fn get_vtable_order(header: &str, class: &str) -> Vec<String> {
+    todo!()
+}
+
+pub fn get_base_method(class: &Ident, method: &str) -> Path {
+    format_ident!("{}_{}", class, method).into()
 }
