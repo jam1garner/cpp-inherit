@@ -21,7 +21,7 @@ pub fn generate_vtable_const(methods: Vec<Path>, ty: &Type) -> impl ToTokens {
     )
 }
 
-/// Returns a list of the names of methods, in order of their layout in memory
+/// Returns a list of the names of virtual methods, in order of their layout in memory
 pub fn get_vtable_order(header: &str, class: &str) -> Vec<String> {
     todo!()
 }
