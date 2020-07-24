@@ -101,7 +101,7 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     match vtable_info.get(&class.to_string()) {
         Some(base_type_vtable) => {
             // Generate a vtable before overrides
-            let base_vtable: Vec<Option<Path>> = base_type_vtable.iter().map(|_| None).collect();
+            let base_vtable: Vec<Option<Path>> = vec![None; base_type_vtable.len()];
 
             let mut vtable = base_vtable;
 
