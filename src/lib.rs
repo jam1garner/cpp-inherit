@@ -84,11 +84,13 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         .iter_mut()
         .for_each(remove_override_attr);
 
+    let self_type = &impl_block.self_ty;
+
     let vtable_const = generate_vtable_const(vec![
         syn::parse_quote!(
-            Test::x
+            #self_type::x
         )
-    ], &impl_block.self_ty);
+    ], self_type);
 
     quote!(
         #impl_block
