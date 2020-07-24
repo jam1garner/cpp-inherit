@@ -1,6 +1,8 @@
+use std::ops::Deref;
+
+use quote::quote;
 use proc_macro::TokenStream;
 use syn::{Fields, ImplItem, Path};
-use quote::{quote, format_ident};
 
 mod method_helpers;
 use method_helpers::{filter_overrides, remove_override_attr, make_extern_c};
@@ -89,14 +91,14 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         .iter_mut()
         .for_each(remove_override_attr);
 
-    let vtable_order = vtable::get_vtable_order(&header, &class.to_string());
+    let vtable_info = vtable::get_vtable_info(&header, &class.to_string());
 
     // Generate a vtable before overrides
-    let base_vtable =
-        vtable_order
+    let base_vtable: Vec<Option<Path>> =
+        vtable_info
             .iter()
-            .map(|method| vtable::get_base_method(&class, &method))
-            .collect::<Vec<_>>();
+            .map(|_| None)
+            .collect();
 
     // List of method override names
     let override_list = 
@@ -112,28 +114,52 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         _ => todo!() // Error about how class type must be ident
     };
 
-    // Apply each override to the base vtable
-    for o in override_list {
-        match vtable_order.binary_search(&o.to_string()) {
-            Ok(index) => {
-                vtable[index] = Path {
-                    leading_colon: None,
-                    // $class::$method
-                    segments: [&type_ident, &o].iter().map(into_path_segment).collect()
-                };
+    match vtable_info.get(&class.to_string()) {
+        Some(base_type_vtable) => {
+            // Apply each override to the base vtable
+            for o in override_list {
+                match base_type_vtable.binary_search_by_key(&&o.to_string(), |entry| &entry.name) {
+                    Ok(index) => {
+                        vtable[index] = Some(Path {
+                            leading_colon: None,
+                            //          $class::$method
+                            segments: [&type_ident, &o].iter().map(into_path_segment).collect()
+                        });
+                    },
+                    Err(..) => todo!() // add compiler error for overriding a non-existing method
+                }
             }
-            Err(..) => todo!(), // add compiler error for overriding a non-existant virtual method
+
+            let mut bindings_to_gen = vec![];
+
+            let vtable =
+                vtable
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, x)| x.unwrap_or_else(|| {
+                        bindings_to_gen.push(base_type_vtable[i].default.deref());
+
+                        vtable::get_binding_symbol(&base_type_vtable[i].default).into()
+                    }))
+                    .collect();
+
+            let self_type = &impl_block.self_ty;
+
+            let vtable_const = generate_vtable_const(vtable, self_type);
+
+            let bindings = bindings_to_gen.into_iter().map(vtable::generate_binding);
+
+            quote!(
+                #impl_block
+
+                #vtable_const
+
+                #(
+                    #bindings
+                )*
+            ).into()
         }
+        None => todo!(), // add compiler error for class not existing in header
     }
-
-    let self_type = &impl_block.self_ty;
-
-    let vtable_const = generate_vtable_const(vtable, self_type);
-
-    quote!(
-        #impl_block
-
-        #vtable_const
-    ).into()
 }
 
