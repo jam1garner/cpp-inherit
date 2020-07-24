@@ -87,16 +87,11 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let vtable_info = vtable::get_vtable_info(&header, &class.to_string());
 
-    // Generate a vtable before overrides
-    let base_vtable: Vec<Option<Path>> = vtable_info.iter().map(|_| None).collect();
-
     // List of method override names
     let override_list = override_items
         .into_iter()
         .map(|method| method.sig.ident.clone())
         .collect::<Vec<_>>();
-
-    let mut vtable = base_vtable;
 
     let type_ident = match *impl_block.self_ty {
         syn::Type::Path(ref path) => path.path.get_ident().unwrap(),
@@ -105,6 +100,11 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     match vtable_info.get(&class.to_string()) {
         Some(base_type_vtable) => {
+            // Generate a vtable before overrides
+            let base_vtable: Vec<Option<Path>> = base_type_vtable.iter().map(|_| None).collect();
+
+            let mut vtable = base_vtable;
+
             // Apply each override to the base vtable
             for o in override_list {
                 match base_type_vtable.binary_search_by_key(&&o.to_string(), |entry| &entry.name) {

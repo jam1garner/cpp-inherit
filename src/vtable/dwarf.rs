@@ -267,9 +267,11 @@ fn walk_node<'abbrev, 'unit, 'tree, R: gimli::Reader>(
     let entry = node.entry();
 
     if entry.tag() == gimli::DW_TAG_structure_type {
-        let name_val = entry
-            .attr_value(gimli::DW_AT_name)?
-            .expect("missing name, this should an Err instead of panicking but I'm lazy");
+        let name_val = if let Some(name_val) = entry.attr_value(gimli::DW_AT_name)? {
+            name_val
+        } else {
+            return Ok(());
+        };
         let name_bytes = dwarf.attr_string(&unit, name_val)?;
         let name = gimli::Reader::to_string(&name_bytes)?.to_string();
 
