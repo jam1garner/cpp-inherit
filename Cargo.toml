@@ -3,6 +3,11 @@ name = "cpp-inherit"
 version = "0.1.0"
 authors = ["jam1garner <8260240+jam1garner@users.noreply.github.com>"]
 edition = "2018"
+license = "MIT"
+readme = "README.md"
+description = "Macros for enabling you to subclass a Rust struct from a C++ class"
+documentation = "https://docs.rs/cpp-inherit"
+repository = "https://github.com/jam1garner/cpp-inherit"
 
 [lib]
 proc-macro = true
