@@ -28,7 +28,7 @@ pub fn inherit_from(attr: TokenStream, item: TokenStream) -> TokenStream {
                 unreachable!()
             }
         }
-        _ => todo!(),
+        _ => panic!("Tuple-type structs cannot inherit from classes"),
     };
 
     let base_field: NamedField = syn::parse_quote!(
@@ -102,8 +102,8 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let type_ident = match *impl_block.self_ty {
-        syn::Type::Path(ref path) => path.path.get_ident().unwrap(),
-        _ => todo!(), // Error about how class type must be ident
+        syn::Type::Path(ref path) => path.path.get_ident().expect("Class type must be an ident"),
+        _ => panic!("Class type must be an ident"), // Error about how class type must be ident
     };
 
     match vtable_info.get(&class.to_string()) {
@@ -123,7 +123,7 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
                             segments: [&type_ident, &o].iter().map(into_path_segment).collect(),
                         });
                     }
-                    Err(..) => todo!(), // add compiler error for overriding a non-existing method
+                    Err(..) => panic!("Cannot override a virtual method that doesn't exist in the original vtable"),
                 }
             }
 
@@ -158,6 +158,6 @@ pub fn inherit_from_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
             )
             .into()
         }
-        None => todo!(), // add compiler error for class not existing in header
+        None => panic!("Class does not exist in header"), // add compiler error for class not existing in header
     }
 }
