@@ -20,6 +20,14 @@ pub fn inherit_from(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let fields = match struct_def.fields {
         Fields::Named(ref mut fields) => &mut fields.named,
+        Fields::Unit => {
+            struct_def.fields = Fields::Named(syn::parse_quote!({}));
+            if let Fields::Named(ref mut fields) = struct_def.fields {
+                &mut fields.named
+            } else {
+                unreachable!()
+            }
+        }
         _ => todo!(),
     };
 
