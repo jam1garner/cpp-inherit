@@ -1,4 +1,4 @@
-use object::{Object, ObjectSection};
+use object::{Object, ObjectSection, ObjectSymbol};
 use std::{
     borrow::{Borrow, Cow},
     collections::HashMap,
@@ -191,6 +191,7 @@ fn add_relocations(
                         }
                     }
                     object::RelocationTarget::Section(_section_idx) => {}
+                    _ => {}
                 }
                 if relocations.insert(offset, relocation).is_some() {
                     eprintln!(
@@ -317,16 +318,9 @@ fn dump_file(
         })
     };
 
-    let no_relocations = (*arena.1.alloc(RelocationMap::default())).borrow();
-    let no_reader = Relocate {
-        relocations: no_relocations,
-        section: Default::default(),
-        reader: Default::default(),
-    };
-
     let mut vtables = HashMap::new();
 
-    let dwarf = gimli::Dwarf::load(&mut load_section, |_| Ok(no_reader.clone())).unwrap();
+    let dwarf = gimli::Dwarf::load(&mut load_section).unwrap();
 
     // Iterate over the compilation units.
     let mut iter = dwarf.units();
