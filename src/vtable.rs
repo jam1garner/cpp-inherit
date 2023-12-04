@@ -34,7 +34,7 @@ pub fn get_vtable_info(header: &str, class: &str) -> HashMap<String, Vec<VTableE
     let out_path = std::path::Path::new(&env::var("OUT_DIR").unwrap()).join(class);
     // Compile the header to an unstripped object file to 
     let mut gcc = Command::new("g++")
-        .args(&[
+        .args([
             // I don't really know why some of these can't be removed but probably best to leave
             // these be
             "-femit-class-debug-always",

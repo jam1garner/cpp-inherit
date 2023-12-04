@@ -24,8 +24,8 @@ impl syn::parse::Parse for NamedField {
     }
 }
 
-impl Into<Field> for NamedField {
-    fn into(self) -> Field {
-        self.0
+impl From<NamedField> for Field {
+    fn from(val: NamedField) -> Self {
+        val.0
     }
 }
