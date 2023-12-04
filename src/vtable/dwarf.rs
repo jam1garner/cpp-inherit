@@ -1,4 +1,4 @@
-use object::{Object, ObjectSection};
+use object::{Object, ObjectSection, ObjectSymbol};
 use std::{
     borrow::{Borrow, Cow},
     collections::HashMap,
@@ -16,7 +16,7 @@ impl<'input, Endian> Reader for gimli::EndianSlice<'input, Endian> where
 }
 
 pub fn get_vtables_from_file(path: &Path) -> HashMap<String, Vec<VTableElement>> {
-    let file = fs::File::open(&path).unwrap();
+    let file = fs::File::open(path).unwrap();
     let mmap = unsafe { memmap::Mmap::map(&file).unwrap() };
     let object = object::File::parse(&*mmap).unwrap();
     let endian = if object.is_little_endian() {
@@ -38,16 +38,13 @@ struct Relocate<'a, R: gimli::Reader<Offset = usize>> {
 impl<'a, R: gimli::Reader<Offset = usize>> Relocate<'a, R> {
     fn relocate(&self, offset: usize, value: u64) -> u64 {
         if let Some(relocation) = self.relocations.get(&offset) {
-            match relocation.kind() {
-                object::RelocationKind::Absolute => {
-                    if relocation.has_implicit_addend() {
-                        // Use the explicit addend too, because it may have the symbol value.
-                        return value.wrapping_add(relocation.addend() as u64);
-                    } else {
-                        return relocation.addend() as u64;
-                    }
+            if let object::RelocationKind::Absolute = relocation.kind() {
+                if relocation.has_implicit_addend() {
+                    // Use the explicit addend too, because it may have the symbol value.
+                    return value.wrapping_add(relocation.addend() as u64);
+                } else {
+                    return relocation.addend() as u64;
                 }
-                _ => {}
             }
         };
         value
@@ -170,7 +167,6 @@ fn add_relocations(
         if offset as u64 != offset64 {
             continue;
         }
-        let offset = offset as usize;
         match relocation.kind() {
             object::RelocationKind::Absolute => {
                 match relocation.target() {
@@ -191,6 +187,7 @@ fn add_relocations(
                         }
                     }
                     object::RelocationTarget::Section(_section_idx) => {}
+                    _ => {}
                 }
                 if relocations.insert(offset, relocation).is_some() {
                     eprintln!(
@@ -218,8 +215,8 @@ pub struct VTableElement {
     pub pos: u64,
 }
 
-fn get_structure_vtable<'abbrev, 'unit, 'tree, R: gimli::Reader>(
-    node: gimli::EntriesTreeNode<'abbrev, 'unit, 'tree, R>,
+fn get_structure_vtable<R: gimli::Reader>(
+    node: gimli::EntriesTreeNode<'_, '_, '_, R>,
     unit: &gimli::Unit<R>,
     dwarf: &gimli::Dwarf<R>,
 ) -> Result<Vec<VTableElement>, gimli::Error> {
@@ -235,9 +232,9 @@ fn get_structure_vtable<'abbrev, 'unit, 'tree, R: gimli::Reader>(
                     .attr_value(gimli::DW_AT_vtable_elem_location)?
                     .and_then(|x| x.exprloc_value()),
             ) {
-                let name_bytes = dwarf.attr_string(&unit, name_val)?;
+                let name_bytes = dwarf.attr_string(unit, name_val)?;
                 let name = gimli::Reader::to_string(&name_bytes)?.to_string();
-                let default_bytes = dwarf.attr_string(&unit, default_val)?;
+                let default_bytes = dwarf.attr_string(unit, default_val)?;
                 let default = gimli::Reader::to_string(&default_bytes)?.to_string();
                 let mut pos_eval = pos_expr.evaluation(unit.encoding());
                 let pos_res = pos_eval.evaluate()?;
@@ -258,8 +255,8 @@ fn get_structure_vtable<'abbrev, 'unit, 'tree, R: gimli::Reader>(
     Ok(vtable)
 }
 
-fn walk_node<'abbrev, 'unit, 'tree, R: gimli::Reader>(
-    node: gimli::EntriesTreeNode<'abbrev, 'unit, 'tree, R>,
+fn walk_node<R: gimli::Reader>(
+    node: gimli::EntriesTreeNode<'_, '_, '_, R>,
     unit: &gimli::Unit<R>,
     dwarf: &gimli::Dwarf<R>,
     vtables: &mut HashMap<String, Vec<VTableElement>>,
@@ -272,7 +269,7 @@ fn walk_node<'abbrev, 'unit, 'tree, R: gimli::Reader>(
         } else {
             return Ok(());
         };
-        let name_bytes = dwarf.attr_string(&unit, name_val)?;
+        let name_bytes = dwarf.attr_string(unit, name_val)?;
         let name = gimli::Reader::to_string(&name_bytes)?.to_string();
 
         let vtable = get_structure_vtable(node, unit, dwarf)?;
@@ -298,7 +295,7 @@ fn dump_file(
     let mut load_section = |id: gimli::SectionId| -> Result<_, object::read::Error> {
         let mut relocations = RelocationMap::default();
         let name = id.name();
-        let data = match object.section_by_name(&name) {
+        let data = match object.section_by_name(name) {
             Some(ref section) => {
                 add_relocations(&mut relocations, object, section);
                 section.uncompressed_data()?
@@ -317,16 +314,9 @@ fn dump_file(
         })
     };
 
-    let no_relocations = (*arena.1.alloc(RelocationMap::default())).borrow();
-    let no_reader = Relocate {
-        relocations: no_relocations,
-        section: Default::default(),
-        reader: Default::default(),
-    };
-
     let mut vtables = HashMap::new();
 
-    let dwarf = gimli::Dwarf::load(&mut load_section, |_| Ok(no_reader.clone())).unwrap();
+    let dwarf = gimli::Dwarf::load(&mut load_section).unwrap();
 
     // Iterate over the compilation units.
     let mut iter = dwarf.units();

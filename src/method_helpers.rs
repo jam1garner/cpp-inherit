@@ -3,7 +3,7 @@ use syn::{Attribute, ImplItemMethod};
 fn is_override_attr(attr: &Attribute) -> bool {
     attr.path
         .get_ident()
-        .map(|ident| ident.to_string() == "overridden")
+        .map(|ident| *ident == "overridden")
         .unwrap_or(false)
 }
 
